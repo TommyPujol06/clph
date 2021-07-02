@@ -4,6 +4,7 @@ extern crate raster;
 
 pub const MAX_PIXEL_DIFFERENCE: usize = 5;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
+pub const SKIP_N_BYTES: usize = 4;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Pixel {
@@ -71,7 +72,11 @@ impl Image {
 
         let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
 
-        for chunk in bytes.chunks(4).into_iter() {
+        for (i, chunk) in bytes.chunks(4).into_iter().enumerate() {
+            if i % SKIP_N_BYTES == 0 && i != 0 {
+                continue;
+            }
+
             let pos = (cur_x, cur_y);
 
             if let [r, g, b, _] = chunk {
@@ -100,20 +105,8 @@ impl Image {
                 if pxl.is_similar(pixel) {
                     similar.push((pixel, pixel.pos));
                     has_found_similar_pixel = true;
-                    // println!("Found similar pixels: {:?} ~= {:?}", pxl, pixel);
                     break;
                 }
-                //  else {
-                //     for similar_pxl in similar.iter() {
-                //         let (pxl_v, _) = similar_pxl;
-                //         if pxl_v.is_similar(pixel) {
-                //             println!("Found similar pixels: {:?} ~= {:?}", pxl_v, pixel);
-                //             similar.push((pixel, pixel.pos));
-                //             has_found_similar_pixel = true;
-                //             break;
-                //         }
-                //     }
-                // }
             }
 
             if !has_found_similar_pixel {
