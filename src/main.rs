@@ -5,6 +5,7 @@ extern crate raster;
 pub const MAX_PIXEL_DIFFERENCE: usize = 5;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
 pub const SKIP_N_BYTES: usize = 4;
+pub const MIN_BLOB_LEN: usize = 15_000;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Pixel {
@@ -25,7 +26,8 @@ pub struct Pixel {
 //      colourN: [...] -- same as first exmaple.
 // }
 
-pub type Blobs<'a> = HashMap<&'a Pixel, Vec<(&'a Pixel, (i32, i32))>>;
+pub type Blob<'a> = Vec<(&'a Pixel, (i32, i32))>;
+pub type Blobs<'a> = HashMap<&'a Pixel, Blob<'a>>;
 
 impl Pixel {
     pub fn new(r: u8, g: u8, b: u8, pos: (i32, i32)) -> Self {
@@ -69,27 +71,29 @@ impl Image {
         assert!(bytes.len() % 4 == 0);
 
         let mut pixels: Vec<Pixel> = Vec::new();
-
-        let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
-
+        let (mut cur_x, mut cur_y): (i32, i32) = (-1, 0);
         for (i, chunk) in bytes.chunks(4).into_iter().enumerate() {
+            if cur_x % img.width == 0 && cur_x != 0 && cur_x != -1 {
+                cur_y += 1;
+                cur_x = 0;
+            } else {
+                cur_x += 1;
+            }
+
             if i % SKIP_N_BYTES == 0 && i != 0 {
                 continue;
             }
 
             let pos = (cur_x, cur_y);
-
             if let [r, g, b, _] = chunk {
+                // FIXME: This is very a bad way of skiping colours.
+                if *r >= 140 && *g >= 140 && *b >= 140 {
+                    // Skip white-grayish colours.
+                    continue;
+                }
                 pixels.push(Pixel::new(*r, *g, *b, pos));
             } else {
                 unreachable!("Bad formatted image.");
-            }
-
-            if cur_x % img.width == 0 && cur_x != 0 {
-                cur_y += 1;
-                cur_x = 0;
-            } else {
-                cur_x += 1;
             }
         }
 
@@ -118,6 +122,46 @@ impl Image {
     }
 }
 
+pub fn max(this: usize, other: usize) -> usize {
+    if this > other {
+        return this;
+    }
+
+    other
+}
+
+pub fn filter_blobs(blobs: Blobs) -> Blobs {
+    let mut filtered: Blobs = Blobs::new();
+    for tup in blobs.iter() {
+        let (key, blob) = tup;
+        if blob.len() >= MIN_BLOB_LEN {
+            filtered.insert(key, blob.clone());
+        }
+    }
+
+    filtered
+}
+
+pub fn find_largest_blob(blobs: Blobs) {
+    let mut biggest_key: &Pixel = &Pixel::new(0, 0, 0, (0, 0));
+    let mut biggest_len = 0;
+
+    for tup in blobs.iter() {
+        let (pxl, blob) = tup;
+        let blob_len = blob.len();
+        biggest_len = max(biggest_len, blob_len);
+        if biggest_len == blob_len {
+            biggest_key = *pxl;
+        }
+    }
+
+    println!(
+        "Biggest blob size: {}",
+        blobs.get(biggest_key).unwrap().len()
+    );
+    // println!("Biggest blob: {:#?}", blobs.get(biggest_key));
+}
+
 fn main() {
     println!("Opening image...");
     let img = Image::open(&"sample.jpeg");
@@ -125,7 +169,8 @@ fn main() {
     let img = Image::from(img);
     println!("Finding blobs in image...");
     let blobs = img.find_blobs();
-
+    let blobs = filter_blobs(blobs);
     println!("Found {} blobs.", blobs.len());
+    find_largest_blob(blobs);
     println!("Image has {} pixels.", img.pixels.len());
 }
