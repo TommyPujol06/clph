@@ -5,8 +5,7 @@ extern crate raster;
 
 pub const MAX_PIXEL_DIFFERENCE: usize = 5;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
-pub const SKIP_N_BYTES: usize = 4;
-pub const MIN_BLOB_LEN: usize = 80_000;
+pub const MIN_BLOB_LEN: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Pixel {
@@ -17,7 +16,7 @@ pub struct Pixel {
 }
 
 // blobs = {
-//      colour1: [
+//      colour1: [ -- Blob
 //              (colour1, (x, y)),
 //              (colour2, (x, y)),
 //              (colourN, (x, y)), -- similar colours to parent colour.
@@ -54,51 +53,44 @@ impl Pixel {
 }
 
 pub struct Image {
+    src: *mut raster::Image,
     pixels: Vec<Pixel>,
 }
 
 impl Image {
-    pub fn open(filepath: &str) -> raster::Image {
-        raster::open(filepath).unwrap_or_else(|e| {
+    pub fn open(filepath: &str) -> Self {
+        let mut src = raster::open(filepath).unwrap_or_else(|e| {
             panic!(
                 "There was an error while opening the image file.\nError: {:#?}",
                 e
             )
-        })
-    }
+        });
 
-    pub fn from(img: raster::Image) -> Self {
-        let bytes = img.bytes;
+        let bytes = src.bytes;
         assert!(bytes.len() % 4 == 0);
 
         let mut pixels: Vec<Pixel> = Vec::new();
         let (mut cur_x, mut cur_y): (i32, i32) = (-1, 0);
-        for (i, chunk) in bytes.chunks(4).into_iter().enumerate() {
-            if cur_x % img.width == 0 && cur_x != 0 && cur_x != -1 {
+        for chunk in bytes.chunks(4).into_iter() {
+            if cur_x % src.width == 0 && cur_x != 0 && cur_x != -1 {
                 cur_y += 1;
                 cur_x = 0;
             } else {
                 cur_x += 1;
             }
 
-            if i % SKIP_N_BYTES == 0 && i != 0 {
-                continue;
-            }
-
             let pos = (cur_x, cur_y);
             if let [r, g, b, _] = chunk {
-                // FIXME: This is very a bad way of skiping colours.
-                if *r >= 140 && *g >= 140 && *b >= 140 {
-                    // Skip white-grayish colours.
-                    continue;
-                }
                 pixels.push(Pixel::new(*r, *g, *b, pos));
             } else {
                 unreachable!("Bad formatted image.");
             }
         }
 
-        Self { pixels }
+        Self {
+            src: &mut src as *mut raster::Image,
+            pixels,
+        }
     }
 
     pub fn find_blobs(&self) -> Blobs {
@@ -127,6 +119,12 @@ pub fn filter_blobs(blobs: Blobs) -> Blobs {
     let mut filtered: Blobs = Blobs::new();
     for tup in blobs.iter() {
         let (key, blob) = tup;
+        let (pxl, _) = blob[0];
+        let luminance = 0.2126 * pxl.r as f64 + 0.7152 * pxl.g as f64 + 0.0722 * pxl.b as f64;
+        if luminance >= 150.0 {
+            continue;
+        }
+
         if blob.len() >= MIN_BLOB_LEN {
             filtered.insert(key, blob.clone());
         }
@@ -148,12 +146,18 @@ pub fn find_largest_blob(blobs: Blobs) -> Blob {
         }
     }
 
-    let blob = blobs.get(biggest_key).unwrap().clone();
+    let blob = blobs
+        .get(biggest_key)
+        .unwrap_or_else(|| {
+            panic!("No blobs found.");
+        })
+        .clone();
     println!("Biggest blob size: {}", blob.len());
     // println!("Biggest blob: {:#?}", blobs.get(biggest_key));
     blob
 }
 
+#[allow(dead_code)]
 pub fn analyse_blob(blob: Blob) {
     let mut biggest_x = 0;
     let mut biggest_y = 0;
@@ -174,16 +178,30 @@ pub fn analyse_blob(blob: Blob) {
     println!("Smallest y: {}", smallest_y);
 }
 
+pub fn draw_results(img: Image, blob: Blob, outfile: &str) {
+    let img_ref = unsafe { img.src.as_mut().unwrap() };
+    for tup in blob.iter() {
+        let (_, pos) = tup;
+        img_ref
+            .set_pixel(pos.0, pos.1, raster::Color::hex("#ffffff").unwrap())
+            .unwrap();
+    }
+
+    raster::save(img_ref, outfile);
+}
+
 fn main() {
     println!("Opening image...");
     let img = Image::open(&"sample.jpeg");
-    println!("Parsing image...");
-    let img = Image::from(img);
+
     println!("Finding blobs in image...");
     let blobs = img.find_blobs();
     let blobs = filter_blobs(blobs);
     println!("Found {} blobs.", blobs.len());
+
     let biggest_blob = find_largest_blob(blobs);
-    analyse_blob(biggest_blob);
+    // analyse_blob(biggest_blob);
+    println!("Drawing over image.");
+    draw_results(img, biggest_blob, &"out.jpeg");
     println!("Image has {} pixels.", img.pixels.len());
 }
