@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 extern crate raster;
 
-pub const MAX_PIXEL_DIFFERENCE: u8 = 5;
+pub const MAX_PIXEL_DIFFERENCE: usize = 5;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -10,48 +10,42 @@ pub struct Pixel {
     r: u8,
     g: u8,
     b: u8,
+    pos: (i32, i32),
 }
 
 // blobs = {
 //      colour1: [
-//          (x, y), -- where we found colour
-//          {
-//              colour1: (x, y),
-//              colour2: (x, y),
-//              colourN: (x, y), -- similar colours to parent colour.
-//          }
-//      ],
+//              (colour1, (x, y)),
+//              (colour2, (x, y)),
+//              (colourN, (x, y)), -- similar colours to parent colour.
+//          ]
+//      ,
 //
 //      colourN: [...] -- same as first exmaple.
 // }
 
-pub enum Blob {
-    Pxl(Box<Pixel>),
-    Similar(HashMap<Pixel, (u64, u64)>),
-}
-
-pub type Blobs = HashMap<Pixel, Vec<Blob>>;
+pub type Blobs<'a> = HashMap<&'a Pixel, Vec<(&'a Pixel, (i32, i32))>>;
 
 impl Pixel {
-    pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
+    pub fn new(r: u8, g: u8, b: u8, pos: (i32, i32)) -> Self {
+        Self { r, g, b, pos }
     }
 
     pub fn is_similar(&self, other: &Pixel) -> bool {
         let mut different_fields: u8 = 0;
-        if ((self.r - other.r) as i8).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
+        if ((self.r as isize - other.r as isize) as isize).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
             different_fields += 1;
         }
 
-        if ((self.g - other.g) as i8).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
+        if ((self.g as isize - other.g as isize) as isize).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
             different_fields += 1;
         }
 
-        if ((self.b - other.b) as i8).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
+        if ((self.b as isize - other.b as isize) as isize).unsigned_abs() > MAX_PIXEL_DIFFERENCE {
             different_fields += 1;
         }
 
-        different_fields <= MAX_FIELDS_DIFFERENT
+        different_fields < MAX_FIELDS_DIFFERENT
     }
 }
 
@@ -74,11 +68,23 @@ impl Image {
         assert!(bytes.len() % 3 == 0);
 
         let mut pixels: Vec<Pixel> = Vec::new();
+
+        let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
+
         for chunk in bytes.chunks(3).into_iter() {
+            let pos = (cur_x, cur_y);
+
             if let [r, g, b] = chunk {
-                pixels.push(Pixel::new(*r, *g, *b));
+                pixels.push(Pixel::new(*r, *g, *b, pos));
             } else {
                 unreachable!("Bad formatted image.");
+            }
+
+            if cur_x % img.width == 0 && cur_x != 0 {
+                cur_y += 1;
+                cur_x = 0;
+            } else {
+                cur_x += 1;
             }
         }
 
@@ -86,18 +92,16 @@ impl Image {
     }
 
     pub fn find_blobs(&self) -> Blobs {
-        let /*mut*/ blobs: Blobs = Blobs::new(); // This will need to be mutable.
-        let mut previous: Pixel = Pixel::new(0, 0, 0);
+        let mut blobs: Blobs = Blobs::new();
         for pixel in self.pixels.iter() {
-            if previous.is_similar(&pixel) {
-                // Check if any pixel with a similar colour is in blobs. If so add this pixel
-                // there.
-                //
-                // Otherwise insert it into the HashMap.
-                todo!();
+            // FIXME: Need to fix this code below.
+            for tup in blobs.iter_mut() {
+                let (pxl, blob) = tup;
+                if pxl.is_similar(pixel) {
+                    println!("Found similar pixels: {:?} ~= {:?}", pxl, pixel);
+                    blob.push((pixel, pixel.pos));
+                }
             }
-
-            previous = *pixel;
         }
 
         blobs
@@ -111,5 +115,7 @@ fn main() {
     let img = Image::from(img);
     println!("Finding blobs in image...");
     let blobs = img.find_blobs();
+
     println!("Found {} blobs.", blobs.len());
+    println!("Image has {} pixels.", img.pixels.len());
 }
