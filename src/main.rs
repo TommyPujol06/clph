@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::HashMap;
 
 extern crate raster;
@@ -5,7 +6,7 @@ extern crate raster;
 pub const MAX_PIXEL_DIFFERENCE: usize = 5;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
 pub const SKIP_N_BYTES: usize = 4;
-pub const MIN_BLOB_LEN: usize = 15_000;
+pub const MIN_BLOB_LEN: usize = 80_000;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Pixel {
@@ -122,14 +123,6 @@ impl Image {
     }
 }
 
-pub fn max(this: usize, other: usize) -> usize {
-    if this > other {
-        return this;
-    }
-
-    other
-}
-
 pub fn filter_blobs(blobs: Blobs) -> Blobs {
     let mut filtered: Blobs = Blobs::new();
     for tup in blobs.iter() {
@@ -142,7 +135,7 @@ pub fn filter_blobs(blobs: Blobs) -> Blobs {
     filtered
 }
 
-pub fn find_largest_blob(blobs: Blobs) {
+pub fn find_largest_blob(blobs: Blobs) -> Blob {
     let mut biggest_key: &Pixel = &Pixel::new(0, 0, 0, (0, 0));
     let mut biggest_len = 0;
 
@@ -155,11 +148,30 @@ pub fn find_largest_blob(blobs: Blobs) {
         }
     }
 
-    println!(
-        "Biggest blob size: {}",
-        blobs.get(biggest_key).unwrap().len()
-    );
+    let blob = blobs.get(biggest_key).unwrap().clone();
+    println!("Biggest blob size: {}", blob.len());
     // println!("Biggest blob: {:#?}", blobs.get(biggest_key));
+    blob
+}
+
+pub fn analyse_blob(blob: Blob) {
+    let mut biggest_x = 0;
+    let mut biggest_y = 0;
+    let mut smallest_x = 10_000_000; // This number needs to be bigger than any possible x
+    let mut smallest_y = 10_000_000;
+
+    for tup in blob.iter() {
+        let (pxl, _) = tup;
+        biggest_x = max(biggest_x, pxl.pos.0);
+        biggest_y = max(biggest_y, pxl.pos.1);
+        smallest_x = min(smallest_x, pxl.pos.0);
+        smallest_y = min(smallest_y, pxl.pos.1);
+    }
+
+    println!("Biggest x: {}", biggest_x);
+    println!("Biggest y: {}", biggest_y);
+    println!("Smallest x: {}", smallest_x);
+    println!("Smallest y: {}", smallest_y);
 }
 
 fn main() {
@@ -171,6 +183,7 @@ fn main() {
     let blobs = img.find_blobs();
     let blobs = filter_blobs(blobs);
     println!("Found {} blobs.", blobs.len());
-    find_largest_blob(blobs);
+    let biggest_blob = find_largest_blob(blobs);
+    analyse_blob(biggest_blob);
     println!("Image has {} pixels.", img.pixels.len());
 }
