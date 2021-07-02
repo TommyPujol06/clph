@@ -65,16 +65,16 @@ impl Image {
 
     pub fn from(img: raster::Image) -> Self {
         let bytes = img.bytes;
-        assert!(bytes.len() % 3 == 0);
+        assert!(bytes.len() % 4 == 0);
 
         let mut pixels: Vec<Pixel> = Vec::new();
 
         let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
 
-        for chunk in bytes.chunks(3).into_iter() {
+        for chunk in bytes.chunks(4).into_iter() {
             let pos = (cur_x, cur_y);
 
-            if let [r, g, b] = chunk {
+            if let [r, g, b, _] = chunk {
                 pixels.push(Pixel::new(*r, *g, *b, pos));
             } else {
                 unreachable!("Bad formatted image.");
@@ -94,13 +94,30 @@ impl Image {
     pub fn find_blobs(&self) -> Blobs {
         let mut blobs: Blobs = Blobs::new();
         for pixel in self.pixels.iter() {
-            // FIXME: Need to fix this code below.
+            let mut has_found_similar_pixel = false;
             for tup in blobs.iter_mut() {
-                let (pxl, blob) = tup;
+                let (pxl, similar) = tup;
                 if pxl.is_similar(pixel) {
-                    println!("Found similar pixels: {:?} ~= {:?}", pxl, pixel);
-                    blob.push((pixel, pixel.pos));
+                    similar.push((pixel, pixel.pos));
+                    has_found_similar_pixel = true;
+                    // println!("Found similar pixels: {:?} ~= {:?}", pxl, pixel);
+                    break;
                 }
+                //  else {
+                //     for similar_pxl in similar.iter() {
+                //         let (pxl_v, _) = similar_pxl;
+                //         if pxl_v.is_similar(pixel) {
+                //             println!("Found similar pixels: {:?} ~= {:?}", pxl_v, pixel);
+                //             similar.push((pixel, pixel.pos));
+                //             has_found_similar_pixel = true;
+                //             break;
+                //         }
+                //     }
+                // }
+            }
+
+            if !has_found_similar_pixel {
+                blobs.insert(pixel, vec![(pixel, pixel.pos)]);
             }
         }
 
