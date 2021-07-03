@@ -1,8 +1,2 @@
 ClpH
 =====
-
-## Bugs
-
-* Result is different every time with same image. Idk why this happens yet.
-|
-|_ > this leads to unpredictable outcomes and thus don't know if the program really works.

@@ -1,13 +1,13 @@
 use std::cell::RefCell;
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 extern crate raster;
 
-pub const MAX_PIXEL_DIFFERENCE: usize = 7;
-pub const MAX_FIELDS_DIFFERENT: u8 = 2;
-pub const MIN_BLOB_LEN: usize = 100_000;
+pub const MAX_PIXEL_DIFFERENCE: usize = 10;
+pub const MAX_FIELDS_DIFFERENT: u8 = 1;
+pub const MIN_BLOB_SIZE: usize = 100_000;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct Pixel {
@@ -77,18 +77,18 @@ impl Image {
         let mut pixels: Vec<Pixel> = Vec::new();
         let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
         for chunk in bytes.chunks(4).into_iter() {
-            if cur_x % src.width == 0 && cur_x != 0 {
-                cur_y += 1;
-                cur_x = 0;
-            } else {
-                cur_x += 1;
-            }
-
             let pos = (cur_x, cur_y);
             if let [r, g, b, _] = chunk {
                 pixels.push(Pixel::new(*r, *g, *b, pos));
             } else {
                 unreachable!("Bad formatted image.");
+            }
+
+            if cur_x % (src.width - 1) == 0 && cur_x != 0 {
+                cur_y += 1;
+                cur_x = 0;
+            } else {
+                cur_x += 1;
             }
         }
 
@@ -107,7 +107,6 @@ impl Image {
                 if pxl.is_similar(pixel) {
                     similar.push(pixel);
                     has_found_similar_pixel = true;
-                    break;
                 }
             }
 
@@ -116,29 +115,27 @@ impl Image {
             }
         }
 
+        let mut filtered: Blob = Blob::new();
+        for blob in blobs.iter() {
+            if blob.1.len() <= MIN_BLOB_SIZE {
+                filtered.push(blob.0);
+            }
+        }
+
+        for pxl in filtered.iter() {
+            blobs.remove(pxl);
+        }
+
         blobs
     }
-}
 
-pub fn filter_blobs(blobs: Blobs) -> Blobs {
-    let mut filtered: Blobs = Blobs::new();
-    for tup in blobs.iter() {
-        let (key, blob) = tup;
-        let pxl = blob[0]; // We only check the first pixel because all the other ones are similar anyways.
-        let luminance = 0.2126 * pxl.r as f64 + 0.7152 * pxl.g as f64 + 0.0722 * pxl.b as f64;
-        if luminance >= 150.0 {
-            continue;
-        }
-
-        if blob.len() >= MIN_BLOB_LEN {
-            filtered.insert(key, blob.clone());
-        }
+    pub fn save(&self, outfile: &str) {
+        let img_ref = self.src.borrow_mut();
+        raster::save(&img_ref, outfile).unwrap();
     }
-
-    filtered
 }
 
-pub fn find_largest_blob(blobs: Blobs) -> Blob {
+pub fn find_largest_blob<'a>(blobs: &'a mut Blobs) -> (&'a Pixel, Vec<&'a Pixel>) {
     let mut biggest_key: &Pixel = &Pixel::new(0, 0, 0, (0, 0));
     let mut biggest_len = 0;
 
@@ -152,60 +149,35 @@ pub fn find_largest_blob(blobs: Blobs) -> Blob {
     }
 
     let blob = blobs
-        .get(biggest_key)
+        .remove_entry(biggest_key)
         .unwrap_or_else(|| {
             panic!("No blobs found.");
         })
         .clone();
-    println!("Biggest blob size: {}", blob.len());
-    // println!("Biggest blob: {:#?}", blobs.get(biggest_key));
+
+    println!("Biggest blob size: {}", blob.1.len());
     blob
 }
 
-#[allow(dead_code)]
-pub fn analyse_blob(blob: Blob) {
-    let mut biggest_x = 0;
-    let mut biggest_y = 0;
-    let mut smallest_x = 10_000_000; // This number needs to be bigger than any possible x
-    let mut smallest_y = 10_000_000;
-
-    for pxl in blob.iter() {
-        biggest_x = max(biggest_x, pxl.pos.0);
-        biggest_y = max(biggest_y, pxl.pos.1);
-        smallest_x = min(smallest_x, pxl.pos.0);
-        smallest_y = min(smallest_y, pxl.pos.1);
-    }
-
-    println!("Biggest x: {}", biggest_x);
-    println!("Biggest y: {}", biggest_y);
-    println!("Smallest x: {}", smallest_x);
-    println!("Smallest y: {}", smallest_y);
-}
-
-pub fn draw_results(img: Image, blob: Blob, outfile: &str) {
+pub fn draw_results(img: Image, blob: Blob) {
     let mut img_ref = img.src.borrow_mut();
     for pxl in blob.iter() {
         img_ref
-            .set_pixel(
-                pxl.pos.0 - 1,
-                pxl.pos.1 - 1,
-                raster::Color::hex("#000000").unwrap(),
-            )
+            .set_pixel(pxl.pos.0, pxl.pos.1, raster::Color::hex("#000000").unwrap())
             .unwrap();
     }
-
-    raster::save(&img_ref, outfile).unwrap();
 }
 
 fn main() {
     println!("Opening image...");
     let img = Image::open(&"sample.jpeg");
     println!("Finding blobs in image...");
-    let blobs = img.find_blobs();
-    let blobs = filter_blobs(blobs);
+    let mut blobs = img.find_blobs();
     println!("Found {} blobs.", blobs.len());
-    let biggest_blob = find_largest_blob(blobs);
-    // analyse_blob(biggest_blob);
-    println!("Drawing over image.");
-    draw_results(img.clone(), biggest_blob, &"out.jpeg");
+    for _ in 0..15 {
+        let largest = find_largest_blob(&mut blobs);
+        draw_results(img.clone(), largest.1);
+    }
+
+    img.save(&"out.jpeg");
 }
