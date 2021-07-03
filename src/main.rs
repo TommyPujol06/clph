@@ -76,19 +76,24 @@ impl Image {
 
         let mut pixels: Vec<Pixel> = Vec::new();
         let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
-        for chunk in bytes.chunks(4).into_iter() {
+        for (i, chunk) in bytes.chunks(4).into_iter().enumerate() {
             let pos = (cur_x, cur_y);
-            if let [r, g, b, _] = chunk {
-                pixels.push(Pixel::new(*r, *g, *b, pos));
-            } else {
-                unreachable!("Bad formatted image.");
-            }
-
             if cur_x % (src.width - 1) == 0 && cur_x != 0 {
                 cur_y += 1;
                 cur_x = 0;
             } else {
                 cur_x += 1;
+            }
+
+            if i % 4 == 0 {
+                // Only parse 1 out of 4 bytes for better performance.
+                continue;
+            }
+
+            if let [r, g, b, _] = chunk {
+                pixels.push(Pixel::new(*r, *g, *b, pos));
+            } else {
+                unreachable!("Bad formatted image.");
             }
         }
 
