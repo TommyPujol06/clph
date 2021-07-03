@@ -3,8 +3,6 @@ ClpH
 
 ## Bugs
 
-* Code does not compile. Should probably store raster::Image in a Rc<RefCell<raster::Image>>.
-
 * Result is different every time with same image. Idk why this happens yet.
 |
 |_ > this leads to unpredictable outcomes and thus don't know if the program really works.
