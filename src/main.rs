@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 extern crate raster;
 
-pub const MAX_PIXEL_DIFFERENCE: usize = 5;
+pub const MAX_PIXEL_DIFFERENCE: usize = 7;
 pub const MAX_FIELDS_DIFFERENT: u8 = 2;
 pub const MIN_BLOB_LEN: usize = 100_000;
 
@@ -186,7 +186,11 @@ pub fn draw_results(img: Image, blob: Blob, outfile: &str) {
     let mut img_ref = img.src.borrow_mut();
     for pxl in blob.iter() {
         img_ref
-            .set_pixel(pxl.pos.0, pxl.pos.1, raster::Color::hex("#000000").unwrap())
+            .set_pixel(
+                pxl.pos.0 - 1,
+                pxl.pos.1 - 1,
+                raster::Color::hex("#000000").unwrap(),
+            )
             .unwrap();
     }
 
