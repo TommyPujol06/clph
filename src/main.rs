@@ -14,7 +14,7 @@ pub struct Pixel {
     pos: (i32, i32),
 }
 
-pub type Blobs<'a> = Vec<&'a Vec<Box<Pixel>>>;
+pub type Blobs<'a> = Vec<&'a Vec<&'a Pixel>>;
 
 impl Pixel {
     pub fn new(r: u8, g: u8, b: u8, pos: (i32, i32)) -> Self {
@@ -41,7 +41,7 @@ impl Pixel {
 
 pub struct Image<'a> {
     src: Rc<RefCell<raster::Image>>,
-    pixels: Vec<Box<Pixel>>,
+    pixels: Vec<Pixel>,
     blobs: Option<Blobs<'a>>,
 }
 
@@ -60,7 +60,7 @@ impl<'a> Image<'a> {
 
         println!("Image is {}x{}", src.width, src.height);
 
-        let mut pixels: Vec<Box<Pixel>> = Vec::new();
+        let mut pixels: Vec<Pixel> = Vec::new();
         let (mut cur_x, mut cur_y): (i32, i32) = (0, 0);
         for (i, chunk) in bytes.chunks(4).into_iter().enumerate() {
             let pos = (cur_x, cur_y);
@@ -81,7 +81,8 @@ impl<'a> Image<'a> {
                 if luminance >= 190.0 {
                     continue; // Skip bright colours.
                 }
-                pixels.push(Box::new(Pixel::new(*r, *g, *b, pos)));
+                let pxl = Pixel::new(*r, *g, *b, pos);
+                pixels.push(pxl);
             } else {
                 unreachable!("Bad formatted image.");
             }
@@ -96,25 +97,8 @@ impl<'a> Image<'a> {
 
     pub fn find_blobs(&mut self) {
         println!("Finding blobs in image...");
+        // TODO: Implement this.
         let blobs: Blobs = Blobs::new();
-
-        // FIXME: This is O(n^3)
-        // for pixel in self.pixels.iter() {
-        //     let mut has_found_similar_pixel = false;
-        //     for blob in blobs.iter_mut() {
-        //         for pxl in blob.iter() {
-        //             if pxl.is_similar(pixel) {
-        //                 blob.push(*pixel);
-        //                 has_found_similar_pixel = true;
-        //             }
-        //         }
-        //     }
-
-        //     if !has_found_similar_pixel {
-        //         blobs.push(&vec![*pixel]);
-        //     }
-        // }
-
         self.blobs = Some(blobs);
     }
 
