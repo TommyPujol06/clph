@@ -14,7 +14,7 @@ pub struct Pixel {
     pos: (i32, i32),
 }
 
-pub type Blobs<'a> = Vec<&'a Vec<&'a Pixel>>;
+pub type Blobs<'a> = Vec<Vec<&'a Pixel>>;
 
 impl Pixel {
     pub fn new(r: u8, g: u8, b: u8, pos: (i32, i32)) -> Self {
@@ -95,10 +95,31 @@ impl<'a> Image<'a> {
         }
     }
 
-    pub fn find_blobs(&mut self) {
+    pub fn find_blobs(&'a mut self) {
         println!("Finding blobs in image...");
-        // TODO: Implement this.
-        let blobs: Blobs = Blobs::new();
+        let mut blobs: Blobs = Blobs::new();
+
+        // FIXME: O(n^3) -- Very inefficient.
+        // FIXME: There is probably a logic error.
+        // FIXME: This takes **very** long.
+        for pixel in self.pixels.iter() {
+            let mut found_match = false;
+            for blob in blobs.iter_mut() {
+                for pxl in blob.to_owned().iter() {
+                    if pxl.is_similar(pixel) {
+                        blob.push(pixel);
+                        found_match = true;
+                        break;
+                    }
+                }
+            }
+
+            if !found_match {
+                blobs.push(vec![pixel]);
+            }
+        }
+
+        println!("Found {} blobs.", blobs.len());
         self.blobs = Some(blobs);
     }
 
@@ -131,13 +152,13 @@ fn main() {
     let mut img = Image::open(&"sample.jpeg");
 
     img.find_blobs();
-    img.sorted_blobs();
+    // img.sorted_blobs();
 
     // let colour = raster::Color::rgb(0, 0, 0);
-    // let max_range = img.blobs.to_owned().unwrap().len();
-    // for i in 0..max_range {
-    //     img.draw_blob(&img.blobs.to_owned().unwrap()[i], &colour);
+    // let blobs = img.blobs.to_owned().unwrap();
+    // for i in 0..20 {
+    //     img.draw_blob(&blobs[i], &colour);
     // }
 
-    img.save(&"out.jpeg");
+    // img.save(&"out.jpeg");
 }
