@@ -1,0 +1,98 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{fancyvrb}
+\usepackage[parfill]{parskip}
+
+\title{Detecting similar chunks in an image.}
+\author{Tommy Pujol}
+\date{\today}
+
+
+\begin{document}
+\maketitle
+
+\section{Preface}
+
+This article is specialized for an especific use case which considers many factors
+that might not make sense in other scenarios.
+
+
+\section{Introduction}
+
+To find similar chunks in an image we must define what we mean by $similar$. For
+this sample program we define $similar$ such as that for two chunks the following
+condition is met: $c_1 - c_2 \leq 45$.
+
+Since we want to find similar chunks the first logical step is to make up the chunks.
+To do this we first need to know how a chunk will be represented.
+
+To start off, a chunk will consist of an array of $N$ pixels whose value will be
+calculated as follows:
+
+\begin{equation}
+	p = \sum_{i=0}^{N} x_i
+\end{equation}
+
+where $x_i$ is iterating over the values of the tuple with it's corresponding rgb
+values. So a chunk $c$ will be something in the form of:
+
+\begin{equation}
+	c = \begin{vmatrix}
+		p_1 & p_2 & p_3 \\
+		p_4 & p_{\dots} & p_n
+	\end{vmatrix}
+\end{equation}
+
+Then we can rewrite the value of a chunck $c$ to be:
+
+\begin{equation}
+	c = \frac{\sum\limits_{i=0}^{N} c_i}{N}
+\end{equation}
+
+Once we have all the chunks we need we need a good way of determining which chunks
+are similar to each other.
+
+\newpage
+\section{References}
+
+1. Sample image input:
+\begin{Verbatim}[samepage=true]
++ ------------------------------------- +
+| | | | | | | | | | | | | | | | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | | |X|X|X|X| |Y|Y|Y|y| | | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | | |x|X|X| | | |Y|Y| | | |Y|Y| | | |
+- - - - - - - - - - - - - - - - - - - - -
+|X|X| | | |X|X| | | |Y|Y| | | |Y|Y| | | |
+- - - - - - - - - - - - - - - - - - - - -
+|X|X| | | |X|X| | | |Y|Y| | | | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | | | | | | | | | | | | | | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | | | | | | | | | | | | | | | | | | |
++ ------------------------------------- +
+\end{Verbatim}
+
+2. Sample image output:
+
+\begin{Verbatim}[samepage=true]
++ ------------------------------------- +
+| | | | |Z|Z|Z|Z| |Z|Z|Z|Z|Z| | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | |Z|X|X|X|X|Z|Y|Y|Y|y|Z| |Z|Z| | | |
+- - - - - - - - - - - - - - - - - - - - -
+|Z|Z| |Z|x|X|X|Z| |Z|Y|Y|Z| |Z|Y|Y|Z| | |
+- - - - - - - - - - - - - - - - - - - - -
+|X|X|Z| |Z|X|X|Z| |Z|Y|Y|Z| |Z|Y|Y|Z| | |
+- - - - - - - - - - - - - - - - - - - - -
+|X|X|Z| |Z|X|X|Z| |Z|Y|Y|Z| | |Z|Z| | | |
+- - - - - - - - - - - - - - - - - - - - -
+|Z|Z| | | |Z|Z| | | |Z|Z| | | | | | | | |
+- - - - - - - - - - - - - - - - - - - - -
+| | | | | | | | | | | | | | | | | | | | |
++ ------------------------------------- +
+\end{Verbatim}
+
+\end{document}
