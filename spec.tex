@@ -1,7 +1,6 @@
 \documentclass{article}
 
 \usepackage{amsmath}
-\usepackage{fancyvrb}
 \usepackage[parfill]{parskip}
 
 \title{Detecting similar chunks in an image.}
@@ -12,20 +11,10 @@
 \begin{document}
 \maketitle
 
-\section{Preface}
-
-This article is specialized for an especific use case which considers many factors
-that might not make sense in other scenarios.
-
-
 \section{Introduction}
 
-To find similar chunks in an image we must define what we mean by $similar$. For
-this sample program we define $similar$ such as that for two chunks the following
-condition is met: $c_1 - c_2 \leq 45$.
-
-Since we want to find similar chunks the first logical step is to make up the chunks.
-To do this we first need to know how a chunk will be represented.
+To find similar chunks we first want to break up the image into chunks.
+To do this we first need to know how will a chunk be represented.
 
 To start off, a chunk will consist of an array of $N$ pixels whose value will be
 calculated as follows:
@@ -40,59 +29,36 @@ values. So a chunk $c$ will be something in the form of:
 \begin{equation}
 	c = \begin{vmatrix}
 		p_1 & p_2 & p_3 \\
-		p_4 & p_{\dots} & p_n
+		p_4 & \dots & p_n
 	\end{vmatrix}
 \end{equation}
 
-Then we can rewrite the value of a chunck $c$ to be:
+Then we can rewrite the value of a chunk $c$ to be:
 
 \begin{equation}
 	c = \frac{\sum\limits_{i=0}^{N} c_i}{N}
 \end{equation}
 
 Once we have all the chunks we need we need a good way of determining which chunks
-are similar to each other.
+are similar to each other. To do this we can calculate the average difference between
+chunks and say that if the difference between two chunks $c_1$ and $c_2$ is less than
+half of the mean difference ($c_1 - c_2 \leq \frac{\overline{x}}{2}$) then we can assume
+that the chunks are similar.
 
-\newpage
-\section{References}
+\begin{equation}
+	C = \begin{vmatrix}
+		c_1 & c_2 & c_3 \\
+		c_4 & \dots & c_n
+	\end{vmatrix}
+\end{equation}
 
-1. Sample image input:
-\begin{Verbatim}[samepage=true]
-+ ------------------------------------- +
-| | | | | | | | | | | | | | | | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | | |X|X|X|X| |Y|Y|Y|y| | | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | | |x|X|X| | | |Y|Y| | | |Y|Y| | | |
-- - - - - - - - - - - - - - - - - - - - -
-|X|X| | | |X|X| | | |Y|Y| | | |Y|Y| | | |
-- - - - - - - - - - - - - - - - - - - - -
-|X|X| | | |X|X| | | |Y|Y| | | | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | | | | | | | | | | | | | | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | | | | | | | | | | | | | | | | | | |
-+ ------------------------------------- +
-\end{Verbatim}
+\begin{equation}
+	\overline{x} = \frac{C_N - C_1}{N - 1}
+\end{equation}
 
-2. Sample image output:
+\footnotetext{For $\overline{x}$ to work the matrix $C$ will need to be sorted from smallest to greatest.}
 
-\begin{Verbatim}[samepage=true]
-+ ------------------------------------- +
-| | | | |Z|Z|Z|Z| |Z|Z|Z|Z|Z| | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | |Z|X|X|X|X|Z|Y|Y|Y|y|Z| |Z|Z| | | |
-- - - - - - - - - - - - - - - - - - - - -
-|Z|Z| |Z|x|X|X|Z| |Z|Y|Y|Z| |Z|Y|Y|Z| | |
-- - - - - - - - - - - - - - - - - - - - -
-|X|X|Z| |Z|X|X|Z| |Z|Y|Y|Z| |Z|Y|Y|Z| | |
-- - - - - - - - - - - - - - - - - - - - -
-|X|X|Z| |Z|X|X|Z| |Z|Y|Y|Z| | |Z|Z| | | |
-- - - - - - - - - - - - - - - - - - - - -
-|Z|Z| | | |Z|Z| | | |Z|Z| | | | | | | | |
-- - - - - - - - - - - - - - - - - - - - -
-| | | | | | | | | | | | | | | | | | | | |
-+ ------------------------------------- +
-\end{Verbatim}
+With this we can now determine which chunks are similar and we can fine-tune the value
+to determine which chunks are similar.
 
 \end{document}
