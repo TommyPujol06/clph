@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define __DEBUG__
 #define __TESTS_ENABLED__
 #define __TEST_ALL_SIMILAR_CHUNKS__
 
@@ -63,23 +64,29 @@ test(void)
 
 	uint16_t idx = 0;
 	uint16_t chunk = 0;
-	for (uint16_t i=1; i != 257; i++) {
-		if (i % 4 == 0) {
+	for (uint16_t i=0; i != 256; i++) {
+		chunk_value(pixels[i], &chunk);
+
+#ifdef __DEBUG__
+		printf("i+1=%d |=> %4 = %d\n", i+1, (i+1) % 4);
+#endif
+		if ((i+1) % 4 == 0) {
+#ifdef __DEBUG__
+			printf("[%d:%d]\tc=%d\tm=%d\n", idx, i, chunk, mean(chunk, 4));
+#endif
 			chunks[idx] = mean(chunk, 4);
 			chunk = 0;
 			idx++;
 		}
-
-		chunk_value(pixels[i], &chunk);
 	}
 
 	if (chunks[0] != 4 || chunks[63] != 760)
-		fail("chunks were not properly calculated.\n");
+		fail("Chunks were not properly calculated.\n");
 
 
 	uint16_t max_diff = get_max_diff(chunks[0], chunks[63], 64);
 	if (max_diff != 6)
-		fail("max difference was not properly calculated.\n");
+		fail("Max difference was not properly calculated.\n");
 
 	if (is_similar(chunks[0], chunks[1], max_diff) != false)
 		fail("c0 and c1 should not be similar!\n");
