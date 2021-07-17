@@ -1,14 +1,15 @@
-#include <math.h>
-#include <stdint.h>
 #include <stdbool.h>
 
-#define __DEBUG__
-#define __TESTS_ENABLED__
-#define __TEST_ALL_SIMILAR_CHUNKS__
+#include "common.h"
+#include "image.h"
 
-#ifdef __TESTS_ENABLED__
-#include <stdlib.h>
-#include <stdio.h>
+// #define __DEBUG__
+// #define __TESTS_ENABLED__
+// #define __TEST_ALL_SIMILAR_CHUNKS__
+
+#if defined(__TEST_ALL_SIMILAR_CHUNKS__) && !defined(__TESTS_ENABLED__)
+	// `fail` is not yet declared so this will give a compiling error which is good.
+	fail("You need to define __TESTS_ENABLED__ for __TEST_ALL_SIMILAR_CHUNKS__ to work.");
 #endif
 
 inline __attribute__((always_inline)) uint16_t
