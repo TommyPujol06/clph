@@ -1,7 +1,9 @@
+#include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
 
 #define __TESTS_ENABLED__
+#define __TEST_ALL_SIMILAR_CHUNKS__
 
 #ifdef __TESTS_ENABLED__
 #include <stdlib.h>
@@ -36,7 +38,7 @@ get_max_diff(uint16_t first, uint16_t last, uint16_t size)
 inline __attribute__((always_inline)) bool
 is_similar(uint16_t c1, uint16_t c2, uint16_t max_diff)
 {
-	return c1 - c2 <= max_diff;
+	return abs(c1 - c2) <= max_diff;
 }
 
 #ifdef __TESTS_ENABLED__
@@ -79,10 +81,20 @@ test(void)
 	if (max_diff != 6)
 		fail("max difference was not properly calculated.\n");
 
-	if (is_similar(chunks[0], chunks[1], max_diff) != true)
-		fail("c0 and c1 should be similar!\n");
+	if (is_similar(chunks[0], chunks[1], max_diff) != false)
+		fail("c0 and c1 should not be similar!\n");
 
-	fprintf(stdout, "All tests successfully passed!\n");
+#ifdef __TEST_ALL_SIMILAR_CHUNKS__
+	chunks[1] = 10; // Change the value of c1 so that it's similar to c0.
+
+	for (uint16_t i=0; i != 64; i++)
+		for (uint16_t j=0; j != 64; j++) {
+			if (i == j) continue;
+			if (is_similar(chunks[i], chunks[j], max_diff))
+				printf("c%d ≈ c%d\n", i, j);
+		}
+#endif
+
 	return 0;
 }
 #endif
@@ -91,7 +103,9 @@ int
 main(void)
 {
 #ifdef __TESTS_ENABLED__
-	return test();
+	int res = test();
+	if (res == 0) printf("All tests successfully passed!\n");
+	return res;
 #else
 	return 0;
 #endif
