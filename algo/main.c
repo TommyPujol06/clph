@@ -12,6 +12,7 @@
 FAIL("You need to define __TESTS_ENABLED__ for __TEST_ALL_SIMILAR_CHUNKS__ to work.\n");
 #endif
 
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 #define FAIL(fmt, ...) fprintf(stderr, "(%s)[%s:%zu] "fmt, __func__, __FILE__, \
 		__LINE__, ##__VA_ARGS__); exit(1);
 
@@ -55,24 +56,27 @@ error:
 	FAIL("Something unexpected happened while opening the image.\n");
 }
 
-uint32_t
-img_read(image_t * img, uint32_t * buffer, uint32_t offset, uint32_t size)
+size_t
+img_read(image_t * img, char * buffer, uint32_t size)
 {
-	if (buffer == NULL)
+	if (buffer == NULL) {
 		FAIL("Did not allocate buffer.\n");
-
-	if (img->size < size)
-		FAIL("You are trying to read more bytes than there are in the image.");
-
-	if (sizeof(buffer) < size) {
-		goto clean;
-		FAIL("Buffer is not big enough.\n");
 	}
+
+	if (img->size < size) {
+		FAIL("You are trying to read more bytes than there are in the image.\n");
+	}
+
+	size_t bytes_read = fread(buffer, 1, size, img->__file);
+	if (ferror(img->__file) != 0) {
+		goto clean;
+	}
+
+	return bytes_read;
 
 clean:
 	free(buffer);
-
-	return 0;
+	FAIL("An error occurred while reading from file.\n");
 }
 
 uint32_t
@@ -88,19 +92,19 @@ img_close(image_t * img)
 	free(img);
 }
 
-inline __attribute__((always_inline)) uint16_t
+ALWAYS_INLINE uint16_t
 pixel_value(uint8_t r, uint8_t g, uint8_t b)
 {
 	return r + g + b;
 }
 
-inline __attribute__((always_inline)) uint16_t
+ALWAYS_INLINE uint16_t
 chunk_value(uint16_t pixel, uint16_t * chunk)
 {
 	*chunk += pixel;
 }
 
-inline __attribute__((always_inline)) uint16_t
+ALWAYS_INLINE uint16_t
 mean(uint16_t total, uint16_t size)
 {
 	return total / size;
@@ -112,7 +116,7 @@ get_max_diff(uint16_t first, uint16_t last, uint16_t size)
 	return (uint16_t)(((last - first) / (size - 1)) / 2);
 }
 
-inline __attribute__((always_inline)) bool
+ALWAYS_INLINE bool
 is_similar(uint16_t c1, uint16_t c2, uint16_t max_diff)
 {
 	return abs(c1 - c2) <= max_diff;
@@ -181,6 +185,11 @@ main(void)
 {
 	image_t * img = img_open("sample.jpeg");
 	printf("Image size (bytes): %zu\n", img->size);
+	char * buf = malloc(sizeof(char) * img->size);
+	if (buf == NULL) {
+		FAIL("Could not allocate enough memory to read the first 16 bytes.\n");
+	}
+	size_t bytes_read = img_read(img, buf, img->size);
 	img_close(img);
 
 #ifdef __TESTS_ENABLED__
