@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <stdio.h>
 
 // #define __DEBUG__
@@ -19,12 +20,14 @@ FAIL("You need to define __TESTS_ENABLED__ for __TEST_ALL_SIMILAR_CHUNKS__ to wo
 typedef struct {
 	FILE * __file;
 	size_t size;
+	unsigned char * buffer;
 } image_t;
 
 
 image_t *
 img_open(const char * image_path)
 {
+	unsigned char * buffer = NULL;
 	FILE * __file = fopen(image_path, "rb+");
 	if (__file == NULL) {
 		FAIL("Could not open file: %s\n", image_path);
@@ -43,40 +46,44 @@ img_open(const char * image_path)
 		goto error;
 	}
 
-	image_t * tmp = malloc(sizeof(image_t));
-	tmp->__file = __file;
-	tmp->size = (size_t)size;
-
-	return tmp;
-
-error:
-	if (__file != NULL)
+	image_t * img = malloc(sizeof(image_t));
+	if (img == NULL) {
 		fclose(__file);
-
-	FAIL("Something unexpected happened while opening the image.\n");
-}
-
-size_t
-img_read(image_t * img, char * buffer, uint32_t size)
-{
-	if (buffer == NULL) {
-		FAIL("Did not allocate buffer.\n");
+		FAIL("Could not allocate memory for image.\n");
 	}
 
-	if (img->size < size) {
-		FAIL("You are trying to read more bytes than there are in the image.\n");
+	img->__file = __file;
+	img->size = (size_t)size;
+
+	buffer = malloc(sizeof(unsigned char) * img->size);
+	if (buffer == NULL) {
+		fclose(__file);
+		FAIL("Could not allocate buffer to hold image data.\n");
 	}
 
 	size_t bytes_read = fread(buffer, 1, size, img->__file);
 	if (ferror(img->__file) != 0) {
-		goto clean;
+		goto error;
 	}
 
-	return bytes_read;
+	if (bytes_read != img->size) {
+		goto error;
+	}
 
-clean:
-	free(buffer);
-	FAIL("An error occurred while reading from file.\n");
+	img->buffer = buffer;
+
+	return img;
+
+error:
+	if (__file != NULL) {
+		fclose(__file);
+	}
+
+	if (buffer != NULL) {
+		free(buffer);
+	}
+
+	FAIL("Something unexpected happened while opening the image.\n");
 }
 
 uint32_t
@@ -90,6 +97,16 @@ img_close(image_t * img)
 {
 	fclose(img->__file);
 	free(img);
+}
+
+void
+img_decode(image_t * img)
+{
+	unsigned char signature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+	if (!memcmp(signature, &img->buffer, 8)) {
+		img_close(img);
+		FAIL("Image is not a PNG.\n");
+	}
 }
 
 ALWAYS_INLINE uint16_t
@@ -183,13 +200,9 @@ test(void)
 int
 main(void)
 {
-	image_t * img = img_open("sample.jpeg");
+	image_t * img = img_open("sample.png");
 	printf("Image size (bytes): %zu\n", img->size);
-	char * buf = malloc(sizeof(char) * img->size);
-	if (buf == NULL) {
-		FAIL("Could not allocate enough memory to read the first 16 bytes.\n");
-	}
-	size_t bytes_read = img_read(img, buf, img->size);
+	img_decode(img);
 	img_close(img);
 
 #ifdef __TESTS_ENABLED__
