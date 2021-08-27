@@ -1,6 +1,0 @@
-/target
-*.aux
-*.log
-*.pdf
-algo/main
-*.o
