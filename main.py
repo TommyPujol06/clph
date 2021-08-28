@@ -1,9 +1,11 @@
 #!.venv/bin/python3
 
-import sys
 import os
+import sys
+import tempfile
 import cv2
 import numpy as np
+from PIL import Image
 
 
 def isolate_colour_range(image, _range):
@@ -13,8 +15,49 @@ def isolate_colour_range(image, _range):
     return cv2.bitwise_and(image, image, mask=mask)
 
 
+# SRC: https://stackoverflow.com/a/55590133
+def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    """Return a sharpened version of the image, using an unsharp mask."""
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+
+    return sharpened
+
+
+def find_edge_coords(image):
+    tmp = f"{tempfile.mktemp()}.png"
+    cv2.imwrite(tmp, image)
+    image = Image.open(tmp).convert("RGB")
+
+    all_pixels = []
+    pixels = image.load()
+    w, h = image.size
+    for i in range(w):
+        for j in range(h):
+            pixel = pixels[i, j]
+            if sum(pixel) == 255 * 3:
+                continue
+
+            all_pixels.append(
+                (
+                    pixel,
+                    (i, j),
+                )
+            )
+
+    os.remove(tmp)
+    return all_pixels
+
+
 def process_image(image):
-    image = isolate_colour_range(
+    image = unsharp_mask(image, sigma=2, amount=6.5)
+    cl = isolate_colour_range(
         image,
         [
             np.array([22, 93, 0]),  # Lower yellow
@@ -22,10 +65,13 @@ def process_image(image):
         ],
     )
 
-    edges = cv2.Canny(image, 100, 200)
-    _, image = cv2.threshold(edges, 100, 255, cv2.THRESH_BINARY_INV)
+    edges = cv2.Canny(cl, 100, 200)
+    _, sqrs = cv2.threshold(edges, 100, 255, cv2.THRESH_BINARY_INV)
 
-    cv2.imwrite("output.png", image)
+    coords = find_edge_coords(sqrs)
+    print(coords)
+
+    # cv2.imwrite("output.png", sqrs)
 
 
 def main(*args):
@@ -41,4 +87,4 @@ def main(*args):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[0:])
+    main(*sys.argv)
