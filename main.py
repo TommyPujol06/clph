@@ -1,11 +1,8 @@
-#!.venv/bin/python3
-
 import os
 import sys
-import tempfile
 import cv2
+import math
 import numpy as np
-from PIL import Image
 
 
 def isolate_colour_range(image, _range):
@@ -15,76 +12,80 @@ def isolate_colour_range(image, _range):
     return cv2.bitwise_and(image, image, mask=mask)
 
 
-# SRC: https://stackoverflow.com/a/55590133
-def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
-    """Return a sharpened version of the image, using an unsharp mask."""
-    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
-    sharpened = float(amount + 1) * image - float(amount) * blurred
-    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
-    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
-    sharpened = sharpened.round().astype(np.uint8)
-    if threshold > 0:
-        low_contrast_mask = np.absolute(image - blurred) < threshold
-        np.copyto(sharpened, image, where=low_contrast_mask)
+def find_mid_points(image):
+    image = cv2.cvtColor(image, cv2.IMREAD_GRAYSCALE)
+    _, _image = cv2.threshold(image, 10, 255, cv2.THRESH_BINARY)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    return sharpened
+    ro_height, width, _ = image.shape
+    height = ro_height
+    mid_width = math.ceil(width / 2)
 
+    # FIXME: After the first square the "middle points" found are actually the bottom.
+    points = []
+    while True:
+        top_point = None
+        bottom_point = None
+        for i in range(height):
+            lp_height = ro_height - height
+            if sum(image[lp_height + i, mid_width]) == 0:
+                if top_point is None:
+                    continue
 
-def find_edge_coords(image):
-    tmp = f"{tempfile.mktemp()}.png"
-    cv2.imwrite(tmp, image)
-    image = Image.open(tmp).convert("RGB")
+                bottom_point = (lp_height + (i - 1), mid_width)
+                break
 
-    all_pixels = []
-    pixels = image.load()
-    w, h = image.size
-    for i in range(w):
-        for j in range(h):
-            pixel = pixels[i, j]
-            if sum(pixel) == 255 * 3:
+            if top_point is None:
+                top_point = (lp_height + i, mid_width)
                 continue
 
-            all_pixels.append(
-                (
-                    pixel,
-                    (i, j),
-                )
-            )
+        if top_point is None or bottom_point is None:
+            break
 
-    os.remove(tmp)
-    return all_pixels
+        sqr = (math.ceil((top_point[0] + bottom_point[0]) / 2), mid_width)
+        points.append(sqr)
+        height -= bottom_point[0]
+
+    return points
 
 
-def process_image(image):
-    image = unsharp_mask(image, sigma=2, amount=6.5)
-    cl = isolate_colour_range(
+def process_sqrs(image, tube):
+    image = isolate_colour_range(
         image,
         [
-            np.array([22, 93, 0]),  # Lower yellow
+            np.array([0, 50, 0]),  # Lower yellow
             np.array([45, 255, 255]),  # Upper yellow
         ],
     )
 
-    edges = cv2.Canny(cl, 100, 200)
-    _, sqrs = cv2.threshold(edges, 100, 255, cv2.THRESH_BINARY_INV)
-
-    coords = find_edge_coords(sqrs)
-    print(coords)
-
-    # cv2.imwrite("output.png", sqrs)
+    image = cv2.medianBlur(image, 101)
+    points = find_mid_points(image)
+    print(points)
 
 
-def main(*args):
-    if len(args) != 2:
-        print(f"Usage: {args[0]} <filepath>")
-        exit(1)
-
-    if not os.path.exists(args[1]) or not os.path.isfile(args[1]):
-        print(f"Image '{args[1]}' could not be found or is not a file.")
-        exit(1)
-
-    process_image(cv2.imread(args[1]))
+def process_tube(image):
+    image = cv2.medianBlur(image, 101)
+    height, width, _ = image.shape
+    mid = math.ceil(height / 2), math.ceil(width / 2)
+    r, g, b = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)[mid]
+    return (r, g, b)
 
 
 if __name__ == "__main__":
-    main(*sys.argv)
+    sqrs = "sqrs.jpeg"
+    tube = "tube.jpeg"
+    if len(sys.argv) > 3:
+        sqrs, tube = sys.argv[1:3]
+
+    images = [sqrs, tube]
+
+    if not all([os.path.exists(image) for image in images]) or not all(
+        [os.path.isfile(image) for image in images]
+    ):
+        raise ValueError(f"Could not find one or more of these images: {images}")
+
+    sqrs = cv2.imread(sqrs)
+    tube = cv2.imread(tube)
+
+    tube = process_tube(tube)
+    sqrs = process_sqrs(sqrs, tube)
