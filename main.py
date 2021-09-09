@@ -16,33 +16,32 @@ def find_mid_points(image):
     image = cv2.cvtColor(image, cv2.IMREAD_GRAYSCALE)
     _, _image = cv2.threshold(image, 10, 255, cv2.THRESH_BINARY)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    ro_height, width, _ = image.shape
-    height = ro_height
+    height, width, _ = image.shape
     mid_width = math.ceil(width / 2)
 
-    # FIXME: After the first square the "middle points" found are actually the bottom.
     points = []
     while True:
         top_point = None
         bottom_point = None
         for i in range(height):
-            lp_height = ro_height - height
-            if sum(image[lp_height + i, mid_width]) == 0:
+            if sum(image[i, mid_width]) < 50:
                 if top_point is None:
                     continue
 
-                bottom_point = (lp_height + (i - 1), mid_width)
+                bottom_point = (i - 1, mid_width)
                 break
 
             if top_point is None:
-                top_point = (lp_height + i, mid_width)
+                top_point = (i, mid_width)
                 continue
 
         if top_point is None or bottom_point is None:
             break
 
-        sqr = (math.ceil((top_point[0] + bottom_point[0]) / 2), mid_width)
+        sqr = (
+            math.ceil((top_point[0] + bottom_point[0]) / 2),
+            mid_width,
+            )  # FIXME: Find actual height.
         points.append(sqr)
         height -= bottom_point[0]
 
