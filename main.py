@@ -45,8 +45,12 @@ def find_mid_points(image):
     return points
 
 
+def rgb_diff(colour1, colour2):
+    return sum([abs(int(v1) - int(v2)) for (v1, v2) in zip(colour1, colour2)])
+
+
 def process_sqrs(image, tube):
-    image = isolate_colour_range(
+    filtered_image = isolate_colour_range(
         image,
         [
             np.array([0, 50, 0]),  # Lower yellow
@@ -54,9 +58,14 @@ def process_sqrs(image, tube):
         ],
     )
 
-    image = cv2.medianBlur(image, 101)
-    points = find_mid_points(image)
-    print(points)
+    blurred_image = cv2.medianBlur(filtered_image, 101)
+    points = find_mid_points(blurred_image)
+    blurred_image = cv2.cvtColor(blurred_image, cv2.COLOR_BGR2RGB)
+    sqr_diffs = {key: rgb_diff(blurred_image[key], tube) for key in points}
+    #print(sqr_diffs)
+    match = min(sqr_diffs, key=sqr_diffs.get)
+    image = cv2.circle(image, tuple(reversed(match)), 150, (255, 0, 0), 15)
+    cv2.imwrite("result.png", image)
 
 
 def process_tube(image):
@@ -68,10 +77,9 @@ def process_tube(image):
 
 
 if __name__ == "__main__":
-    sqrs = "sqrs.jpeg"
-    tube = "tube.jpeg"
-    if len(sys.argv) > 3:
-        sqrs, tube = sys.argv[1:3]
+    # sqrs = "sqrs.jpeg"
+    # tube = "tube.jpeg"
+    sqrs, tube = sys.argv[1:3]
 
     images = [sqrs, tube]
 
