@@ -13,37 +13,34 @@ def isolate_colour_range(image, _range):
 
 
 def find_mid_points(image):
+    points = []
     image = cv2.cvtColor(image, cv2.IMREAD_GRAYSCALE)
-    _, _image = cv2.threshold(image, 10, 255, cv2.THRESH_BINARY)
+    _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     height, width, _ = image.shape
     mid_width = math.ceil(width / 2)
 
-    points = []
-    while True:
-        top_point = None
-        bottom_point = None
-        for i in range(height):
-            if sum(image[i, mid_width]) < 50:
-                if top_point is None:
-                    continue
+    top_point = None
+    bottom_point = None
 
-                bottom_point = (i - 1, mid_width)
-                break
+    for i in range(height):
+        if sum(image[i, mid_width]) == 0:  # Black
+            if not top_point:
+                continue  # Skip black "line" if no top point found.
 
+            bottom_point = (i - 1, mid_width)
+            mid = (math.ceil((top_point[0] + bottom_point[0]) / 2), mid_width)
+            points.append(mid)
+            top_point = None
+            bottom_point = None
+
+        else:
             if top_point is None:
                 top_point = (i, mid_width)
-                continue
 
-        if top_point is None or bottom_point is None:
-            break
-
-        sqr = (
-            math.ceil((top_point[0] + bottom_point[0]) / 2),
-            mid_width,
-            )  # FIXME: Find actual height.
-        points.append(sqr)
-        height -= bottom_point[0]
+    if top_point is not None and bottom_point is None:
+        mid = (math.ceil((top_point[0] + height) / 2), mid_width)
+        points.append(mid)
 
     return points
 
